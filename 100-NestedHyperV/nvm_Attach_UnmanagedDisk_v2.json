@@ -1,0 +1,75 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+	"parameters": {
+		"BrokenVHDUri": {
+			"type": "string",
+			"defaultValue": "<VHD URI>",
+            "metadata": {
+                "description": "Paste here URI path to vhd Location"
+            }		
+        }
+	},
+    "variables": {
+		"vmName":           "nvmVMHyperv",
+		"vmLocation":       "[resourceGroup().location]",
+        "scriptFolder":     ".",
+        "scriptFileName":   "nvm_Attach_Disk.ps1",
+        "CurrentTimeStamp": "1991-12-31T23:59:60Z",
+        "_artifactsLocation": "https://nvmstdpublic.blob.core.windows.net/nested",
+		"_artifactsLocationSasToken": "?st=2017-09-02T12%3A41%3A00Z&se=2018-10-03T12%3A41%3A00Z&sp=rl&sv=2016-05-31&sr=c&sig=NY7igwylIhJnpwB0w%2Fwn9w5YKla%2F5uQKhQBUAV4YlQo%3D"		
+    },
+    "resources": [
+        {
+            "name": "[variables('vmName')]",
+            "type": "Microsoft.Compute/virtualMachines",
+            "apiVersion": "2016-04-30-preview",
+            "location": "[variables('vmLocation')]",
+            "properties": {
+                "storageProfile": {
+                    "dataDisks": [
+						{  
+							"name" : "[concat(variables('vmName'), '-DataDisk1')]",  
+							"lun" : 0
+						},
+						{  
+							"name" : "[concat(variables('vmName'), '-DataDisk2')]",  
+							"createOption": "attach",
+							"lun" : 1,  
+							"vhd":{   
+								"uri": "[parameters('BrokenVHDUri')]"
+							}
+						}
+					]
+                }
+            },
+            "resources": [
+    			{
+                    "name": "nvm_CustomScript",
+                    "type": "extensions",
+                    "location": "[variables('vmLocation')]",
+                    "apiVersion": "2015-06-15",
+                    "dependsOn": [
+                        "[concat('Microsoft.Compute/virtualMachines/', concat(variables('vmName')))]"
+                    ],
+                    "tags": {
+                        "displayName": "nvm_Attach_UnmanagedDisk"
+                    },
+                    "properties": {
+                        "publisher": "Microsoft.Compute",
+                        "type": "CustomScriptExtension",
+                        "typeHandlerVersion": "1.9",
+                        "autoUpgradeMinorVersion": true,
+                        "settings": {
+                            "fileUris": [
+                                "[concat(variables('_artifactsLocation'), '/', variables('ScriptFileName'), variables('_artifactsLocationSasToken'))]"
+                            ],
+							"timestamp" : "[variables('CurrentTimeStamp')]",
+                            "commandToExecute": "[concat('powershell -ExecutionPolicy Unrestricted -File ', variables('scriptFolder'), '/', variables('scriptFileName'))]"
+                        }
+                    }
+			    }
+            ]
+        }
+    ]
+}

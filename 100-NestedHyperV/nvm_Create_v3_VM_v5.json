@@ -1,0 +1,201 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+	"parameters": {},
+    "variables": {
+		"vmName":           "nvmVMHyperv",
+		"vmNic":            "[concat(variables('vmName'), '_NIC1')]",
+		"vmPip":            "[concat(variables('vmName'), '_PIP1')]",
+		"vmNsg":            "[concat(variables('vmName'), '_NSG1')]",
+		"vmLocation":       "[resourceGroup().location]",
+		"vmSize":           "Standard_D2s_v3",
+		"vmAdminUsername":  "adminazure",
+		"vmAdminPassword":  "AdminAzure!1",
+		"vmSAName":         "[toLower( concat( 'nvm', uniqueString(resourceGroup().id) ) )]",
+        "scriptFolder":     ".",
+        "scriptFileName":   "nvm_Add_HyperV_RoleW2k16_VM1.ps1",
+        "CurrentTimeStamp": "1990-12-31T23:59:60Z",
+		"vnetName": 		"nvm-vnet",
+		"subnetName":       "nvm-subnet",
+        "subnetRef":        "[concat(variables('vnetId'), '/subnets/', variables('subnetName'))]",
+        "vnetId":           "[resourceId('Microsoft.Network/virtualNetworks', variables('vnetName'))]",
+        "_artifactsLocation": "https://nvmstdpublic.blob.core.windows.net/nested",
+		"_artifactsLocationSasToken": "?st=2017-09-02T12%3A41%3A00Z&se=2018-10-03T12%3A41%3A00Z&sp=rl&sv=2016-05-31&sr=c&sig=NY7igwylIhJnpwB0w%2Fwn9w5YKla%2F5uQKhQBUAV4YlQo%3D"
+    },
+    "resources": [
+		{
+			"name": "[variables('vmSAName')]",
+			"type": "Microsoft.Storage/storageAccounts",
+			"apiVersion": "2016-01-01",
+            "location": "[variables('vmLocation')]",
+			"sku": {
+			  "name": "Standard_LRS"
+			},
+			"kind": "Storage"
+		},
+        {
+            "name": "[variables('vmName')]",
+            "type": "Microsoft.Compute/virtualMachines",
+            "apiVersion": "2016-04-30-preview",
+            "location": "[variables('vmLocation')]",
+            "dependsOn": [
+                "[concat('Microsoft.Storage/storageAccounts/', variables('vmSAName'))]",
+                "[concat('Microsoft.Network/networkInterfaces/', variables('vmNic'))]"
+            ],
+            "properties": {
+                "osProfile": {
+                    "computerName": "[variables('vmName')]",
+                    "adminUsername": "[variables('vmAdminUsername')]",
+                    "adminPassword": "[variables('vmAdminPassword')]",
+                    "windowsConfiguration": {
+                        "provisionVmAgent": "true"
+                    }
+                },
+                "hardwareProfile": {
+                    "vmSize": "[variables('vmSize')]"
+                },
+                "storageProfile": {
+                    "imageReference": {
+                        "publisher": "MicrosoftWindowsServer",
+                        "offer": "WindowsServer",
+                        "sku": "2016-Datacenter",
+                        "version": "latest"
+                    },
+                    "osDisk": {
+                        "name": "[concat(variables('vmName'), '-OsDisk')]",
+                        "createOption": "fromImage",
+                        "vhd": {
+                            "uri": "[concat(concat(reference(resourceId('Microsoft.Storage/storageAccounts', variables('vmSAName')), '2015-06-15').primaryEndpoints['blob'], 'nested/'), variables('vmName'), '-OsDisk.vhd')]"
+                        }
+                    },
+                    "dataDisks": [
+						{  
+							"name" : "[concat(variables('vmName'), '-DataDisk1')]",  
+							"createOption": "empty",
+							"diskSizeGB" : "4095",  
+							"lun" : 0,  
+							"vhd":{   
+								"uri": "[concat(concat(reference(resourceId('Microsoft.Storage/storageAccounts', variables('vmSAName')), '2015-06-15').primaryEndpoints['blob'], 'nested/'), variables('vmName'), '-DataDisk1.vhd')]"
+							}
+						}  
+					]
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('vmNic'))]"
+                        }
+                    ]
+                }
+            },
+            "resources": [
+    			{
+                    "name": "nvm_CustomScript",
+                    "type": "extensions",
+                    "location": "[variables('vmLocation')]",
+                    "apiVersion": "2015-06-15",
+                    "dependsOn": [
+                        "[concat('Microsoft.Compute/virtualMachines/', concat(variables('vmName')))]"
+                    ],
+                    "tags": {
+                        "displayName": "nvm_Add_HyperV_RoleW2k16_VM1"
+                    },
+                    "properties": {
+                        "publisher": "Microsoft.Compute",
+                        "type": "CustomScriptExtension",
+                        "typeHandlerVersion": "1.9",
+                        "autoUpgradeMinorVersion": true,
+                        "settings": {
+                            "fileUris": [
+                                "[concat(variables('_artifactsLocation'), '/', variables('ScriptFileName'), variables('_artifactsLocationSasToken'))]"
+                            ],
+							"timestamp" : "[variables('CurrentTimeStamp')]",
+                            "commandToExecute": "[concat('powershell -ExecutionPolicy Unrestricted -File ', variables('scriptFolder'), '/', variables('scriptFileName'))]"
+                        }
+                    }
+			    }
+            ]
+        },
+        {
+            "name": "[variables('vmNic')]",
+            "type": "Microsoft.Network/networkInterfaces",
+            "apiVersion": "2016-09-01",
+            "location": "[variables('vmLocation')]",
+            "dependsOn": [
+                "[concat('Microsoft.Network/publicIpAddresses/', variables('vmPip'))]",
+                "[concat('Microsoft.Network/networkSecurityGroups/', variables('vmNsg'))]",
+                "[concat('Microsoft.Network/virtualNetworks/', variables('vnetName'))]"
+            ],
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig1",
+                        "properties": {
+                            "subnet": {
+                                "id": "[variables('subnetRef')]"
+                            },
+                            "privateIPAllocationMethod": "Dynamic",
+                            "publicIpAddress": {
+                                "id": "[resourceId('Microsoft.Network/publicIpAddresses', variables('vmPip'))]"
+                            }
+                        }
+                    }
+                ],
+                "networkSecurityGroup": {
+                    "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('vmNsg'))]"
+                }
+            }
+        },
+        {
+            "name": "[variables('vnetName')]",
+            "type": "Microsoft.Network/virtualNetworks",
+            "apiVersion": "2015-06-15",
+            "location": "[variables('vmLocation')]",
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": ["10.0.0.0/24"]
+                },
+                "subnets": [
+                    {
+                        "name": "[variables('subnetName')]",
+                        "properties": {
+                            "addressPrefix": "10.0.0.0/24"
+                        }
+                    }
+                ]
+            }
+        },		
+        {
+            "name": "[variables('vmPip')]",
+            "type": "Microsoft.Network/publicIpAddresses",
+            "apiVersion": "2016-11-01",
+            "location": "[variables('vmLocation')]",
+            "properties": {
+                "publicIpAllocationMethod": "Dynamic"
+            }
+        },
+        {
+            "name": "[variables('vmNsg')]",
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "apiVersion": "2016-09-01",
+            "location": "[variables('vmLocation')]",
+            "properties": {
+                "securityRules": [
+                    {
+                        "name": "default-allow-rdp",
+                        "properties": {
+                            "priority": 1000,
+                            "sourceAddressPrefix": "*",
+                            "protocol": "TCP",
+                            "destinationPortRange": "3389",
+                            "access": "Allow",
+                            "direction": "Inbound",
+                            "sourcePortRange": "*",
+                            "destinationAddressPrefix": "*"
+                        }
+                    }
+                ]
+            }
+        }		
+    ]
+}
