@@ -6,6 +6,6 @@
 
 This template allows you to deploy a new VM (DS_v3 or ES_v3) that supports Nested Environment.
 On deployment installs all Hyper-v roles
- [ ] list1
- [ ] list2
+ - [x] list1
+ - [ ] list2
  :sparkles:
