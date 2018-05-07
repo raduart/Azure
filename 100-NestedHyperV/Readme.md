@@ -1,3 +1,4 @@
+![Azure Logo](https://github.com/raduart/Azure/blob/master/Images/AzureLogo60x45.jpg)
 # Azure Nested Hyper-v Environment
 
 #### 1 - Create VM for Hyper-v environment
