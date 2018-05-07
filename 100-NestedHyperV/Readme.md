@@ -1,5 +1,6 @@
 ![Azure Logo](https://github.com/raduart/Azure/blob/master/Images/AzureLogo60x45.jpg)
 # Azure Nested Hyper-v Environment
+-------------------------------------------
 
 #### 1 - Create VM for Hyper-v environment
 This template allows you to deploy a new VM (DS_v3 or ES_v3) that supports Nested Environment.On deployment installs all Hyper-v roles
